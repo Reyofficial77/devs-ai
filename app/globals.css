@@ -1,0 +1,82 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: #ffffff;
+}
+
+.dark body {
+  background-color: #131320;
+}
+
+/* Scrollbar tipis, konsisten di light/dark */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(37, 99, 235, 0.18);
+  border-radius: 999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(140, 100, 240, 0.25);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Styling isi jawaban AI (react-markdown) */
+.prose-chat p {
+  margin: 0 0 0.65rem 0;
+  line-height: 1.65;
+}
+.prose-chat p:last-child {
+  margin-bottom: 0;
+}
+.prose-chat ul,
+.prose-chat ol {
+  margin: 0 0 0.65rem 1.1rem;
+  line-height: 1.6;
+}
+.prose-chat li {
+  margin-bottom: 0.25rem;
+}
+.prose-chat strong {
+  font-weight: 600;
+}
+.prose-chat h1,
+.prose-chat h2,
+.prose-chat h3 {
+  font-weight: 600;
+  margin: 1rem 0 0.5rem 0;
+}
+.prose-chat code:not(pre code) {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: rgba(37, 99, 235, 0.08);
+  padding: 0.15em 0.4em;
+  border-radius: 0.35em;
+}
+.dark .prose-chat code:not(pre code) {
+  background: rgba(140, 100, 240, 0.18);
+}
+.prose-chat a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.dark .prose-chat a {
+  color: #a886ff;
+}
