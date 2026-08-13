@@ -93,15 +93,16 @@ export default function Sidebar({ user, chats, open, onClose }: Props) {
               Belum ada percakapan.
             </p>
           )}
-          {chats.map((chat) => {
+          {chats.map((chat, i) => {
             const active = pathname === `/chat/${chat.id}`;
             return (
               <Link
                 key={chat.id}
                 href={`/chat/${chat.id}`}
                 onClick={onClose}
+                style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
                 className={`
-                  group flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm truncate transition-colors
+                  group flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm truncate transition-all duration-150 animate-fadeIn opacity-0 [animation-fill-mode:forwards] hover:translate-x-0.5
                   ${
                     active
                       ? "bg-brand-50 dark:bg-violet-500/15 text-brand-700 dark:text-violet-200 font-medium"

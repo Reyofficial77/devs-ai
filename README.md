@@ -1,86 +1,110 @@
-# Devs AI — Asisten AI untuk Developer Roblox
+# Devs AI — Panduan Setup Lengkap (dari Nol)
 
-AI chat khusus buat bantu Developer Roblox: nulis script Luau, jelasin sistem game (Rebirth, DataStore, RemoteEvent, dll), dan generate file kode yang bisa langsung didownload (per file atau sekaligus `.zip`).
+AI chat khusus buat Developer Roblox — Next.js + Gemini API + Supabase Auth & Database. Panduan ini sudah termasuk semua fix dari isu-isu yang pernah ketemu pas setup di Termux/Android.
 
-## Fitur
+---
 
-- Login wajib: Google, GitHub, atau Email/Password (Supabase Auth)
-- Chat AI pakai Gemini API, dengan system prompt yang sudah diarahkan khusus Roblox dev
-- Setiap balasan AI yang mengandung kode dengan judul file otomatis dapat tombol **Download**, dan kalau ada beberapa file sekaligus muncul tombol **Download semua (.zip)**
-- Riwayat chat tersimpan permanen di database Supabase, bisa dibuka lagi kapan saja, bisa dihapus
-- Mobile-friendly: sidebar jadi hamburger menu di HP, layout menyesuaikan layar kecil
-- Tema otomatis ikut sistem HP/laptop: **White + Blue** (terang) atau **Dark + Purple** (gelap), bisa juga di-toggle manual
+## 0. Yang perlu disiapkan dulu
 
-## Struktur Project
+- HP Android dengan **Termux** ter-install (dari F-Droid, bukan Play Store — versi Play Store sudah tidak di-update)
+- Akun [Supabase](https://supabase.com) (gratis)
+- Akun [Google AI Studio](https://aistudio.google.com) buat API key Gemini (gratis)
+- Akun GitHub (buat push kode + deploy)
+- Akun [Vercel](https://vercel.com) (gratis, login pakai GitHub)
 
-```
-devs-ai/
-├── app/
-│   ├── api/
-│   │   ├── chat/route.ts          → endpoint kirim pesan ke Gemini
-│   │   └── chats/[chatId]/route.ts → endpoint hapus chat
-│   ├── auth/callback/route.ts     → handle redirect OAuth Google/GitHub
-│   ├── chat/
-│   │   ├── layout.tsx             → ambil data user + daftar chat
-│   │   ├── page.tsx                → halaman chat baru (kosong)
-│   │   └── [chatId]/page.tsx      → halaman chat yang sudah ada isinya
-│   ├── login/page.tsx             → halaman login
-│   └── layout.tsx / globals.css
-├── components/                     → semua komponen UI (Sidebar, ChatView, Message, dll)
-├── lib/
-│   ├── gemini.ts                   → konfigurasi & system prompt Gemini
-│   ├── supabase/                   → client Supabase (browser & server)
-│   └── utils/codeParser.ts         → logic deteksi code block + fungsi download
-├── supabase/schema.sql             → SQL buat setup database
-└── middleware.ts                   → proteksi route /chat (wajib login)
-```
+---
 
-## 1. Setup Awal (Termux / Android)
+## 1. Setup Termux + Linux (Ubuntu via proot)
 
-Kalau kamu kerja dari Termux seperti project kamu yang lain, lakukan ini dulu:
+Android/Termux **tidak punya binary native SWC** yang dibutuhkan Next.js, jadi kita jalankan semuanya dari dalam Ubuntu yang di-install di atas Termux.
 
 ```bash
 pkg update && pkg upgrade -y
-pkg install nodejs-lts git -y
+pkg install proot-distro git -y
+proot-distro install ubuntu
 ```
 
-Lalu extract folder `devs-ai` hasil download ini, masuk ke foldernya, dan install dependency:
+Setiap kali mau kerja, masuk ke Ubuntu sambil mount folder Termux (`$HOME`) supaya file project bisa diakses dari dalam:
 
 ```bash
+proot-distro login ubuntu --bind $HOME:/root/termux-home
+```
+
+**Mulai dari sini, semua perintah dijalankan DI DALAM Ubuntu ini.** Install Node.js (sekali saja, per instalasi Ubuntu):
+
+```bash
+apt update && apt install -y nodejs npm
+```
+
+> Kalau nanti keluar dari sesi ini (nutup Termux dll), tinggal ulangi perintah `proot-distro login ubuntu --bind $HOME:/root/termux-home` — tidak perlu install ulang dari awal.
+
+---
+
+## 2. Extract project & install dependency
+
+```bash
+cd /root/termux-home/downloads
+unzip devs-ai.zip
 cd devs-ai
+```
+
+**Ganti dulu lokasi cache npm** (bug proot-distro bikin cache default gagal):
+
+```bash
+mkdir -p /tmp/npm-cache
+npm config set cache /tmp/npm-cache
+```
+
+Install dependency:
+
+```bash
 npm install
 ```
 
-> **Catatan penting untuk Termux (arm64):** Turbopack Next.js belum didukung penuh di Termux. Kalau nanti mau jalanin mode development, pakai:
-> ```bash
-> npx next dev --webpack
-> ```
-> bukan `npm run dev` biasa (yang di `package.json` sudah dipakai default webpack juga, tapi kalau ada error terkait Turbopack, tambahkan flag `--webpack` secara manual).
+**Wajib:** buat file `.babelrc` supaya Next.js tidak butuh binary native SWC (yang memang tidak tersedia untuk Android):
 
-## 2. Setup Supabase (Database + Login)
+```bash
+cat > .babelrc << 'EOF'
+{
+  "presets": ["next/babel"]
+}
+EOF
+```
 
-1. Buat akun & project baru di [supabase.com](https://supabase.com)
-2. Buka **SQL Editor** di dashboard Supabase → New Query → paste seluruh isi file `supabase/schema.sql` → klik **Run**. Ini akan otomatis membuat tabel `chats`, `messages`, beserta aturan keamanan (Row Level Security) supaya user tidak bisa lihat chat user lain.
-3. Aktifkan provider login di **Authentication → Providers**:
-   - **Email**: biasanya sudah aktif secara default
-   - **Google**: butuh Client ID & Secret dari [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   - **GitHub**: butuh Client ID & Secret dari [GitHub Developer Settings](https://github.com/settings/developers)
-   - Di kedua provider OAuth tersebut, isi **Authorization callback URL** dengan:
-     `https://[project-id].supabase.co/auth/v1/callback` (Supabase kasih tau URL persisnya di halaman provider)
-4. Ambil **Project URL** dan **anon public key** di **Project Settings → API**
+> ⚠️ File `.babelrc` ini **cuma buat lokal Termux**, jangan sampai ikut ke-push ke GitHub (nanti bikin build Vercel gagal). Sudah otomatis diabaikan lewat `.gitignore` di project ini.
 
-## 3. Setup Gemini API
+---
 
-1. Buka [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-2. Buat API Key baru (gratis, ada kuota harian)
+## 3. Setup Database & Login (Supabase)
 
-## 4. Isi Environment Variables
+1. Buat project baru di [supabase.com](https://supabase.com)
+2. Buka **SQL Editor** → New Query → paste seluruh isi file `supabase/schema.sql` dari project ini → **Run**. Ini bikin tabel `chats`, `messages`, plus aturan keamanan (RLS) biar user tidak bisa lihat chat user lain.
+3. Buka **Authentication → Providers**, aktifkan:
+   - **Email** (biasanya sudah default aktif)
+   - **Google** — butuh Client ID & Secret dari [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   - **GitHub** — butuh Client ID & Secret dari [GitHub Developer Settings](https://github.com/settings/developers)
+   - Di kedua OAuth provider itu, isi callback URL dengan URL yang Supabase kasih tau di halaman provider-nya (formatnya `https://[project-id].supabase.co/auth/v1/callback`)
+4. **Authentication → URL Configuration** — isi dulu dengan localhost untuk sekarang (nanti diganti lagi di Langkah 6 setelah deploy):
+   - Site URL: `http://localhost:3000`
+   - Redirect URLs: `http://localhost:3000/auth/callback`
+5. Ambil **Project URL** dan **anon public key** di **Project Settings → API** (key-nya panjang, pastikan ke-copy full)
 
-Ubah nama file `.env.example` jadi `.env.local`, lalu isi:
+---
+
+## 4. Setup Gemini API
+
+1. Buka [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → buat API key baru
+
+---
+
+## 5. Isi Environment Variables & jalankan lokal
 
 ```bash
 mv .env.example .env.local
+nano .env.local
 ```
+
+Isi 4 baris ini:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=isi_dari_supabase
@@ -89,36 +113,75 @@ GEMINI_API_KEY=isi_dari_google_ai_studio
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-## 5. Jalankan di Local
+Simpan (`Ctrl+O`, Enter, `Ctrl+X` di nano), lalu jalankan:
 
 ```bash
 npm run dev
 ```
 
-Buka `http://localhost:3000` — otomatis diarahkan ke halaman login.
+Buka `http://localhost:3000` di browser HP. Compile pertama agak lambat (Babel + proot), sabar aja.
 
-## 6. Deploy ke Vercel
+---
 
-1. Push project ini ke GitHub (repo baru)
-2. Buka [vercel.com](https://vercel.com) → New Project → import repo tadi
-3. Di bagian **Environment Variables**, isi 4 variabel yang sama seperti di `.env.local`, tapi untuk `NEXT_PUBLIC_SITE_URL` isi dengan domain Vercel kamu, contoh: `https://devs-ai.vercel.app`
-4. Deploy. Setelah live, jangan lupa update **Authorization callback URL** di Google Cloud Console & GitHub OAuth App dengan domain Vercel yang baru (bukan localhost lagi)
+## 6. Push ke GitHub & Deploy ke Vercel
 
-## Cara Kerja Download File
+**Push ke GitHub:**
 
-Gemini diarahkan lewat system prompt (`lib/gemini.ts`) supaya setiap kali menulis kode file yang utuh, dia tulis dengan format:
-
-````
-```lua title="RebirthSystem.server.lua"
--- isi kode
+```bash
+git init
+git add .
+git commit -m "Devs AI - initial commit"
+git remote add origin https://github.com/USERNAME/devs-ai.git
+git branch -M main
+git push -u origin main
 ```
-````
 
-Frontend (`lib/utils/codeParser.ts`) mendeteksi pola ini, lalu menampilkan tombol download di bawah tiap balasan AI. Kalau dalam satu balasan ada lebih dari satu file, muncul juga tombol **Download semua (.zip)** yang membundel semua file jadi satu `.zip` menggunakan library `jszip` — proses ini 100% terjadi di browser (client-side), tidak perlu server storage tambahan.
+Ganti `USERNAME`. Kalau diminta password, pakai **Personal Access Token** (buat di github.com/settings/tokens, centang scope `repo`) — bukan password akun biasa.
 
-## Kemungkinan Pengembangan Lanjutan
+> Kalau kena "Repository not found", pastikan repo `devs-ai` sudah benar-benar dibuat dulu di GitHub (github.com/new, jangan centang "Add README").
 
-- Simpan file yang di-generate ke **Supabase Storage** biar link download-nya tetap ada walau riwayat chat dibuka lagi nanti (saat ini file di-generate ulang dari teks pesan yang tersimpan, jadi sebenarnya tetap bisa didownload kapan saja selama chat-nya ada)
-- Fitur rename judul chat manual
-- Fitur search di riwayat chat
-- Upload gambar (misal screenshot error di Roblox Studio) untuk ditanyakan ke AI (Gemini support multimodal)
+**Deploy ke Vercel:**
+
+1. [vercel.com/new](https://vercel.com/new) → Import repo `devs-ai`
+2. Framework otomatis kedeteksi Next.js, biarkan default
+3. Isi **Environment Variables** (4 variabel sama seperti `.env.local`), untuk `NEXT_PUBLIC_SITE_URL` isi domain Vercel kamu nanti (boleh isi asal dulu, edit lagi setelah tau domainnya)
+4. **Deploy**
+
+**Setelah live**, kembali ke Supabase → **Authentication → URL Configuration**, update:
+- Site URL → `https://domain-kamu.vercel.app`
+- Redirect URLs → tambahkan `https://domain-kamu.vercel.app/auth/callback` (boleh biarkan yang localhost tetap ada juga)
+
+Lalu balik ke Vercel → **Settings → Environment Variables**, update `NEXT_PUBLIC_SITE_URL` ke domain Vercel yang benar → **Deployments → (⋯) → Redeploy** (env variable baru butuh redeploy manual, tidak otomatis kepakai).
+
+Kalau pakai Google/GitHub OAuth, jangan lupa juga update **Authorized redirect URI** di Google Cloud Console / GitHub OAuth App kalau ada validasi domain tambahan di sana.
+
+---
+
+## Troubleshooting Cepat
+
+| Gejala | Penyebab | Solusi |
+|---|---|---|
+| `npm install` error `ENOENT ... _cacache` | Bug cache npm di proot-distro | `npm config set cache /tmp/npm-cache` lalu install ulang |
+| `Failed to load SWC binary for android/arm64` | Termux gak punya binary native | Pastikan `.babelrc` ada & jalan dari dalam Ubuntu (proot), bukan Termux langsung |
+| Build Vercel gagal, error di `react-markdown`/regex Unicode | `.babelrc` ikut ke-push ke GitHub | `git rm --cached .babelrc`, pastikan ada di `.gitignore`, push lagi |
+| Login Google/GitHub selalu balik ke `localhost` | Site URL Supabase belum diupdate | Authentication → URL Configuration → ganti Site URL & Redirect URLs ke domain Vercel |
+| Email login: "Invalid API key" | Anon key salah/kepotong di Vercel env var | Copy ulang full anon key dari Supabase, update di Vercel, lalu **Redeploy manual** |
+| Gemini error "model ... no longer available" | Model Gemini di-deprecate Google | Cek model terbaru di [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models), update `GEMINI_MODEL` di `lib/gemini.ts` |
+
+---
+
+## Struktur Project (ringkas)
+
+```
+devs-ai/
+├── app/
+│   ├── api/chat/route.ts          → endpoint chat (streaming ke Gemini)
+│   ├── api/chats/[chatId]/route.ts → hapus chat
+│   ├── auth/callback/route.ts     → handle redirect OAuth
+│   ├── chat/                       → halaman chat (baru & histori)
+│   └── login/page.tsx             → halaman login
+├── components/                     → Sidebar, ChatView, Message, ChatInput, dll
+├── lib/gemini.ts                   → konfigurasi model + system prompt AI
+├── lib/supabase/                   → client Supabase (browser & server)
+└── supabase/schema.sql             → SQL setup database + RLS
+```

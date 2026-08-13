@@ -71,11 +71,49 @@ const config: Config = {
         blink: {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.2" }
+        },
+        bubbleInLeft: {
+          "0%": { opacity: "0", transform: "translateY(6px) scale(0.98)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" }
+        },
+        bubbleInRight: {
+          "0%": { opacity: "0", transform: "translateY(6px) scale(0.98)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" }
+        },
+        thinkBounce: {
+          "0%, 80%, 100%": { transform: "scale(0.6)", opacity: "0.4" },
+          "40%": { transform: "scale(1)", opacity: "1" }
+        },
+        cursorBlink: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0" }
+        },
+        popIn: {
+          "0%": { opacity: "0", transform: "scale(0.9)" },
+          "100%": { opacity: "1", transform: "scale(1)" }
+        },
+        shimmer: {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" }
+        },
+        pulseGlow: {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(124,77,224,0.35)" },
+          "50%": { boxShadow: "0 0 0 6px rgba(124,77,224,0)" }
         }
       },
       animation: {
         fadeIn: "fadeIn 0.25s ease-out",
-        blink: "blink 1.2s infinite ease-in-out"
+        blink: "blink 1.2s infinite ease-in-out",
+        bubbleInLeft: "bubbleInLeft 0.28s cubic-bezier(0.16,1,0.3,1)",
+        bubbleInRight: "bubbleInRight 0.28s cubic-bezier(0.16,1,0.3,1)",
+        thinkBounce: "thinkBounce 1.1s infinite ease-in-out both",
+        cursorBlink: "cursorBlink 0.9s infinite step-start",
+        popIn: "popIn 0.2s cubic-bezier(0.16,1,0.3,1)",
+        shimmer: "shimmer 2s infinite linear",
+        pulseGlow: "pulseGlow 1.8s infinite ease-in-out"
+      },
+      backgroundSize: {
+        shimmer: "200% 100%"
       }
     }
   },

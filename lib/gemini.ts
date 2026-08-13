@@ -2,9 +2,13 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// Model Gemini yang dipakai. Bisa diganti sesuai kebutuhan/kuota kamu di
-// https://aistudio.google.com/apikey — misal "gemini-2.0-flash" atau "gemini-1.5-pro".
-export const GEMINI_MODEL = "gemini-2.0-flash";
+// Model Gemini yang dipakai. gemini-2.0-flash sudah resmi dimatikan Google.
+// Per Agustus 2026, "gemini-3.6-flash" adalah model Flash terbaru yang berstatus GA
+// (production-ready) dan direkomendasikan resmi oleh Google — gemini-2.5-flash sendiri
+// akan pensiun 16 Okt 2026, jadi langsung pakai generasi 3.x lebih aman untuk jangka panjang.
+// Kalau suatu saat model ini juga di-deprecate, cek daftar model terbaru di
+// https://ai.google.dev/gemini-api/docs/models dan tinggal ganti string di bawah ini.
+export const GEMINI_MODEL = "gemini-3.6-flash";
 
 export const SYSTEM_PROMPT = `Kamu adalah "Devs AI", asisten AI khusus untuk para Developer Roblox.
 
@@ -43,4 +47,22 @@ export async function askGemini(history: GeminiHistoryItem[], newMessage: string
   const chat = model.startChat({ history });
   const result = await chat.sendMessage(newMessage);
   return result.response.text();
+}
+
+// Versi streaming: mengembalikan potongan teks (chunk) satu per satu begitu Gemini
+// selesai men-generate-nya, bukan menunggu jawaban lengkap. Ini yang dipakai buat efek
+// "AI sedang mengetik" secara real (bukan animasi pura-pura di frontend).
+export async function* askGeminiStream(history: GeminiHistoryItem[], newMessage: string) {
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_MODEL,
+    systemInstruction: SYSTEM_PROMPT
+  });
+
+  const chat = model.startChat({ history });
+  const result = await chat.sendMessageStream(newMessage);
+
+  for await (const chunk of result.stream) {
+    const text = chunk.text();
+    if (text) yield text;
+  }
 }

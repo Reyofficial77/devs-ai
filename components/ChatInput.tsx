@@ -53,10 +53,14 @@ export default function ChatInput({ onSend, disabled }: Props) {
         <button
           type="submit"
           disabled={disabled || !value.trim()}
-          className="w-9 h-9 shrink-0 rounded-xl bg-brand-500 dark:bg-violet-500 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-brand-600 dark:hover:bg-violet-600 transition-colors"
+          className="w-9 h-9 shrink-0 rounded-xl bg-brand-500 dark:bg-violet-500 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-brand-600 dark:hover:bg-violet-600 active:scale-90 transition-all duration-150"
           aria-label="Kirim"
         >
-          {disabled ? <Loader2 size={16} className="animate-spin" /> : <ArrowUp size={16} />}
+          {disabled ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <ArrowUp size={16} className="transition-transform" />
+          )}
         </button>
       </div>
       <p className="text-center text-[11px] text-ink-soft/60 dark:text-violet-200/30 mt-2">
