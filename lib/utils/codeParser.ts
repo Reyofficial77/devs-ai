@@ -55,3 +55,41 @@ export async function downloadFilesAsZip(zipName: string, files: CodeFile[]) {
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+// =========================================================
+// Marker penyimpanan memori project besar.
+// Format dari AI: {{DEVSAI_SAVE_PROJECT:{"title":"...","details":"..."}}}
+// Selalu ditaruh AI di baris paling akhir balasan, dan harus disembunyikan
+// dari tampilan user (dipakai di Message.tsx) sekaligus diparsing di backend
+// (dipakai di app/api/chat/route.ts) buat disimpan ke tabel project_memory.
+// =========================================================
+const SAVE_PROJECT_REGEX = /\{\{DEVSAI_SAVE_PROJECT:(\{[\s\S]*?\})\}\}/;
+
+export interface ParsedProjectMemory {
+  title: string;
+  details: string;
+}
+
+// Menghapus marker dari teks, buat ditampilkan ke user (dipakai di Message.tsx).
+export function stripProjectMemoryMarker(text: string): string {
+  return text.replace(SAVE_PROJECT_REGEX, "").trim();
+}
+
+// Mengekstrak data project dari teks (kalau ada), buat disimpan ke database.
+// Dipakai di backend setelah stream selesai & fullText sudah lengkap.
+export function extractProjectMemory(text: string): ParsedProjectMemory | null {
+  const match = text.match(SAVE_PROJECT_REGEX);
+  if (!match) return null;
+
+  try {
+    const parsed = JSON.parse(match[1]);
+    if (typeof parsed.title === "string" && typeof parsed.details === "string") {
+      return { title: parsed.title.trim(), details: parsed.details.trim() };
+    }
+    return null;
+  } catch {
+    // JSON tidak valid (AI kadang bisa salah format) — abaikan saja,
+    // jangan sampai bikin seluruh request gagal cuma gara-gara ini.
+    return null;
+  }
+}

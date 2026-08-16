@@ -86,6 +86,43 @@ create policy "Users can delete messages in their own chats"
   );
 
 -- =========================================================
+-- Memori Project Besar (lintas chat/sesi)
+-- Menyimpan ringkasan project besar yang sedang dikerjakan user (misal: game
+-- Roblox dengan banyak sistem), supaya Devs AI tetap "ingat" walau user buka
+-- chat baru. Diisi otomatis oleh AI lewat app/api/chat/route.ts, bukan manual.
+-- =========================================================
+
+create table if not exists public.project_memory (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  title text not null,
+  details text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, title)
+);
+
+create index if not exists project_memory_user_id_idx on public.project_memory(user_id);
+
+alter table public.project_memory enable row level security;
+
+create policy "Users can view their own project memory"
+  on public.project_memory for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own project memory"
+  on public.project_memory for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update their own project memory"
+  on public.project_memory for update
+  using (auth.uid() = user_id);
+
+create policy "Users can delete their own project memory"
+  on public.project_memory for delete
+  using (auth.uid() = user_id);
+
+-- =========================================================
 -- Selesai. Setelah ini, aktifkan provider login di:
 -- Authentication > Providers > Google / GitHub (isi Client ID & Secret).
 -- Untuk redirect URL, pakai: https://domain-kamu.com/auth/callback

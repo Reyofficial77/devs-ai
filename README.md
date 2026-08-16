@@ -91,9 +91,17 @@ EOF
 
 ---
 
-## 4. Setup Gemini API
+## 4. Setup Gemini API (bisa lebih dari 1 key)
 
 1. Buka [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → buat API key baru
+
+**Fitur fallback otomatis:** project ini mendukung sampai **3 API key Gemini sekaligus**. Kalau key #1 kena limit kuota harian, sistem otomatis pindah pakai key #2, lalu key #3 — tanpa user sadar ada perpindahan, dan tanpa perlu restart server. Supaya kuota gratisnya benar-benar terpisah (bukan gabung jadi satu limit), buat tiap key dari **akun Google yang berbeda**:
+
+- Key #1 → akun Google A → isi ke `GEMINI_API_KEY`
+- Key #2 → akun Google B → isi ke `GEMINI_API_KEY_2`
+- Key #3 → akun Google C → isi ke `GEMINI_API_KEY_3`
+
+`GEMINI_API_KEY_2` dan `GEMINI_API_KEY_3` sifatnya **opsional** — kalau cuma diisi 1, sistem tetap jalan normal seperti biasa (tanpa fallback).
 
 ---
 
@@ -110,6 +118,8 @@ Isi 4 baris ini:
 NEXT_PUBLIC_SUPABASE_URL=isi_dari_supabase
 NEXT_PUBLIC_SUPABASE_ANON_KEY=isi_dari_supabase
 GEMINI_API_KEY=isi_dari_google_ai_studio
+GEMINI_API_KEY_2=isi_dari_google_ai_studio_akun_kedua
+GEMINI_API_KEY_3=isi_dari_google_ai_studio_akun_ketiga
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
@@ -144,7 +154,7 @@ Ganti `USERNAME`. Kalau diminta password, pakai **Personal Access Token** (buat 
 
 1. [vercel.com/new](https://vercel.com/new) → Import repo `devs-ai`
 2. Framework otomatis kedeteksi Next.js, biarkan default
-3. Isi **Environment Variables** (4 variabel sama seperti `.env.local`), untuk `NEXT_PUBLIC_SITE_URL` isi domain Vercel kamu nanti (boleh isi asal dulu, edit lagi setelah tau domainnya)
+3. Isi **Environment Variables** (5 variabel sama seperti `.env.local` — `GEMINI_API_KEY_2`/`_3` boleh dikosongkan kalau belum punya), untuk `NEXT_PUBLIC_SITE_URL` isi domain Vercel kamu nanti (boleh isi asal dulu, edit lagi setelah tau domainnya)
 4. **Deploy**
 
 **Setelah live**, kembali ke Supabase → **Authentication → URL Configuration**, update:
@@ -156,6 +166,44 @@ Lalu balik ke Vercel → **Settings → Environment Variables**, update `NEXT_PU
 Kalau pakai Google/GitHub OAuth, jangan lupa juga update **Authorized redirect URI** di Google Cloud Console / GitHub OAuth App kalau ada validasi domain tambahan di sana.
 
 ---
+
+## Fitur Memori Project Besar
+
+Kalau kamu minta Devs AI buatkan sesuatu yang tergolong **project besar** (contoh: "buatkan game Roblox dengan sistem Rebirth, banyak area, shop, dan leaderboard"), AI **tidak langsung ngoding** — dia tanya dulu detail yang masih kurang (tema, fitur, batasan, dll). Setelah cukup jelas, AI otomatis menyimpan ringkasan project itu ke database (`project_memory`), terikat ke akun user — **bukan** ke satu chat doang.
+
+Efeknya: kalau kamu buka **chat baru** kapan pun, AI otomatis "ingat" project besar yang lagi kamu kerjakan, tanpa perlu jelasin ulang dari nol. Untuk permintaan kecil (1 script, 1 pertanyaan singkat), AI langsung bantu seperti biasa tanpa nanya-nanya dulu.
+
+> Kalau kamu sudah punya project Supabase yang lama (sudah pernah run `schema.sql` sebelumnya), **jangan run ulang seluruh file itu** — nanti error karena beberapa policy sudah ada duluan. Cukup jalankan SQL tambahan di bawah ini saja di SQL Editor Supabase:
+>
+> ```sql
+> create table if not exists public.project_memory (
+>   id uuid primary key default gen_random_uuid(),
+>   user_id uuid not null references auth.users(id) on delete cascade,
+>   title text not null,
+>   details text not null,
+>   created_at timestamptz not null default now(),
+>   updated_at timestamptz not null default now(),
+>   unique (user_id, title)
+> );
+>
+> create index if not exists project_memory_user_id_idx on public.project_memory(user_id);
+>
+> alter table public.project_memory enable row level security;
+>
+> create policy "Users can view their own project memory"
+>   on public.project_memory for select using (auth.uid() = user_id);
+>
+> create policy "Users can insert their own project memory"
+>   on public.project_memory for insert with check (auth.uid() = user_id);
+>
+> create policy "Users can update their own project memory"
+>   on public.project_memory for update using (auth.uid() = user_id);
+>
+> create policy "Users can delete their own project memory"
+>   on public.project_memory for delete using (auth.uid() = user_id);
+> ```
+>
+> Untuk project Supabase yang benar-benar baru, cukup run `supabase/schema.sql` seperti biasa (sudah termasuk tabel ini).
 
 ## Troubleshooting Cepat
 

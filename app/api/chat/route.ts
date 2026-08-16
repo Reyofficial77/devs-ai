@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { askGeminiStream, type GeminiHistoryItem } from "@/lib/gemini";
+import { askGeminiStream, buildSystemPrompt, type GeminiHistoryItem } from "@/lib/gemini";
+import { extractProjectMemory } from "@/lib/utils/codeParser";
 import type { MessageRow } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -49,6 +50,16 @@ export async function POST(request: Request) {
       parts: [{ text: m.content }]
     }));
 
+    // Ambil memori project besar milik user (dari chat/sesi manapun sebelumnya),
+    // supaya Devs AI tetap "ingat" project yang sedang dikerjakan walau ini chat baru.
+    const { data: projectMemories } = await supabase
+      .from("project_memory")
+      .select("title, details")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false });
+
+    const systemPrompt = buildSystemPrompt(projectMemories || []);
+
     // Simpan pesan user ke database.
     await supabase.from("messages").insert({
       chat_id: activeChatId,
@@ -56,8 +67,9 @@ export async function POST(request: Request) {
       content: message
     });
 
-    const geminiStream = askGeminiStream(history, message);
+    const geminiStream = askGeminiStream(history, message, systemPrompt);
     const finalChatId = activeChatId;
+    const userId = user.id;
     let fullText = "";
 
     // Streaming body: tiap chunk dari Gemini langsung diteruskan ke client
@@ -88,6 +100,22 @@ export async function POST(request: Request) {
             .from("chats")
             .update({ updated_at: new Date().toISOString() })
             .eq("id", finalChatId);
+
+          // Kalau AI menandai ada project besar yang perlu diingat, simpan/update
+          // ke tabel project_memory. Pakai upsert berdasarkan (user_id, title)
+          // supaya project yang sama ter-update, bukan bikin entry duplikat.
+          const projectMemory = extractProjectMemory(fullText);
+          if (projectMemory) {
+            await supabase.from("project_memory").upsert(
+              {
+                user_id: userId,
+                title: projectMemory.title,
+                details: projectMemory.details,
+                updated_at: new Date().toISOString()
+              },
+              { onConflict: "user_id,title" }
+            );
+          }
 
           controller.close();
         }

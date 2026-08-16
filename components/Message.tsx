@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight, oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "@/components/ThemeProvider";
-import { downloadTextFile, downloadFilesAsZip, extractCodeFiles } from "@/lib/utils/codeParser";
+import { downloadTextFile, downloadFilesAsZip, extractCodeFiles, stripProjectMemoryMarker } from "@/lib/utils/codeParser";
 import { Download, FileArchive, Sparkles, User } from "lucide-react";
 import type { Role } from "@/lib/types";
 
@@ -18,7 +18,8 @@ interface Props {
 export default function Message({ role, content, isStreaming = false }: Props) {
   const { theme } = useTheme();
   const isUser = role === "user";
-  const files = !isUser ? extractCodeFiles(content) : [];
+  const displayContent = !isUser ? stripProjectMemoryMarker(content) : content;
+  const files = !isUser ? extractCodeFiles(displayContent) : [];
 
   // Selagi masih streaming & belum ada teks sama sekali, biarkan ThinkingBubble
   // di ChatView yang tampil (hindari bubble kosong kedip-kedip).
@@ -105,7 +106,7 @@ export default function Message({ role, content, isStreaming = false }: Props) {
                   }
                 }}
               >
-                {content}
+                {displayContent}
               </ReactMarkdown>
               {isStreaming && (
                 <span className="inline-block w-[2px] h-[1em] align-middle bg-brand-500 dark:bg-violet-400 ml-0.5 animate-cursorBlink" />

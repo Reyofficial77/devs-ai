@@ -1,6 +1,30 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+// =========================================================
+// Sistem multi-API-key dengan fallback otomatis.
+// Kalau GEMINI_API_KEY (key #1) kena limit kuota, otomatis coba
+// GEMINI_API_KEY_2, lalu GEMINI_API_KEY_3. Cukup isi key mana saja
+// yang kamu punya di .env.local — yang kosong otomatis dilewati.
+// =========================================================
+const API_KEYS = [
+  process.env.GEMINI_API_KEY,
+  process.env.GEMINI_API_KEY_2,
+  process.env.GEMINI_API_KEY_3
+].filter((key): key is string => Boolean(key && key.trim()));
+
+// Cek apakah error yang terjadi memang soal kuota/rate limit habis
+// (bukan error lain seperti API key salah/invalid atau masalah jaringan).
+function isQuotaError(err: any): boolean {
+  const status = err?.status ?? err?.response?.status;
+  const message = (err?.message || "").toLowerCase();
+  return (
+    status === 429 ||
+    message.includes("quota") ||
+    message.includes("resource_exhausted") ||
+    message.includes("rate limit") ||
+    message.includes("rate_limit")
+  );
+}
 
 // Model Gemini yang dipakai. gemini-2.0-flash sudah resmi dimatikan Google.
 // Per Agustus 2026, "gemini-3.6-flash" adalah model Flash terbaru yang berstatus GA
@@ -31,38 +55,128 @@ ATURAN PENULISAN KODE:
 GAYA JAWABAN:
 - Jelaskan dulu secara singkat apa yang akan dibuat/dijelaskan, baru tampilkan kode.
 - Setelah kode, beri catatan singkat cara pakainya di Roblox Studio kalau relevan (misal: taruh di ServerScriptService, StarterPlayerScripts, dsb).
-- Kalau pertanyaan user ambigu, boleh tanya balik singkat, tapi kalau bisa diasumsikan dengan wajar, langsung bantu.`;
+- Kalau pertanyaan user ambigu, boleh tanya balik singkat, tapi kalau bisa diasumsikan dengan wajar, langsung bantu.
+
+ATURAN KHUSUS UNTUK PROJECT BESAR:
+- "Project besar" artinya permintaan yang mencakup SATU SISTEM UTUH atau lebih dengan banyak bagian saling terkait — contoh: game lengkap, sistem Rebirth dengan banyak area & multiplier, sistem inventory+shop+currency terintegrasi, atau aplikasi dengan banyak fitur. BUKAN permintaan kecil seperti "buatkan 1 script sederhana", "jelaskan cara pakai RemoteEvent", atau perbaikan bug 1 file.
+- Kalau user meminta PROJECT BESAR dan detailnya belum jelas, JANGAN langsung membuatkan kode. Tanya dulu hal-hal penting yang masih kurang jelas, misalnya: nama/tema project, fitur-fitur utama yang diinginkan, gaya UI, batasan teknis, atau referensi game lain. Tanya secukupnya saja (beberapa poin dalam satu balasan), jangan bertele-tele.
+- Setelah user menjawab dan kamu sudah punya gambaran cukup lengkap tentang project besar itu (atau setiap kali ada detail penting baru/berubah soal project besar yang sedang dikerjakan), kamu WAJIB menyimpannya ke memori dengan menambahkan baris khusus di PALING AKHIR balasanmu, persis format ini (satu baris, JSON valid, tanpa teks lain menempel di baris yang sama):
+  {{DEVSAI_SAVE_PROJECT:{"title":"Judul Singkat Project","details":"Ringkasan lengkap: tema/genre, fitur-fitur yang sudah disepakati, keputusan desain, progress sejauh ini, dan hal yang masih perlu dikerjakan."}}}
+- Baris {{DEVSAI_SAVE_PROJECT:...}} ini TIDAK akan terlihat oleh user (otomatis disembunyikan sistem), jadi jangan menyinggungnya sama sekali di teks balasan biasa.
+- title harus konsisten kalau kamu update project yang sama (misal selalu "Game Roblox: Run For ASMR"), supaya ringkasan lama ter-update, bukan malah bikin entry baru yang terpisah.
+- JANGAN memakai format ini untuk obrolan singkat/pertanyaan kecil yang bukan bagian dari project besar.
+
+MEMORI PROJECT YANG SUDAH TERSIMPAN:
+- Kalau di bawah prompt ini ada bagian "RINGKASAN PROJECT BESAR USER YANG SUDAH TERSIMPAN", itu adalah project(-project) besar yang pernah dibahas user di sesi/chat SEBELUMNYA. Gunakan sebagai konteks kalau relevan dengan pesan user sekarang — user tidak perlu mengulang dari awal. Kalau user melanjutkan project itu, jangan tanya ulang hal-hal yang sudah ada di ringkasan, cukup tanyakan yang belum jelas saja.`;
+
+// Membangun system prompt akhir, dengan menyisipkan ringkasan project besar
+// milik user (kalau ada) supaya AI "ingat" walau di chat/sesi yang baru.
+export function buildSystemPrompt(projectMemories: { title: string; details: string }[]): string {
+  if (!projectMemories || projectMemories.length === 0) {
+    return SYSTEM_PROMPT;
+  }
+
+  const memoryBlock = projectMemories
+    .map((p) => `### ${p.title}\n${p.details}`)
+    .join("\n\n");
+
+  return `${SYSTEM_PROMPT}\n\nRINGKASAN PROJECT BESAR USER YANG SUDAH TERSIMPAN:\n${memoryBlock}`;
+}
 
 export interface GeminiHistoryItem {
   role: "user" | "model";
   parts: { text: string }[];
 }
 
-export async function askGemini(history: GeminiHistoryItem[], newMessage: string) {
-  const model = genAI.getGenerativeModel({
-    model: GEMINI_MODEL,
-    systemInstruction: SYSTEM_PROMPT
-  });
+export async function askGemini(
+  history: GeminiHistoryItem[],
+  newMessage: string,
+  systemPrompt: string = SYSTEM_PROMPT
+) {
+  if (API_KEYS.length === 0) {
+    throw new Error("Tidak ada GEMINI_API_KEY yang di-set di environment variables.");
+  }
 
-  const chat = model.startChat({ history });
-  const result = await chat.sendMessage(newMessage);
-  return result.response.text();
+  let lastError: any = null;
+
+  for (let i = 0; i < API_KEYS.length; i++) {
+    const genAI = new GoogleGenerativeAI(API_KEYS[i]);
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_MODEL,
+      systemInstruction: systemPrompt
+    });
+
+    try {
+      const chat = model.startChat({ history });
+      const result = await chat.sendMessage(newMessage);
+      return result.response.text();
+    } catch (err: any) {
+      lastError = err;
+      const isLastKey = i === API_KEYS.length - 1;
+      if (isQuotaError(err) && !isLastKey) {
+        console.warn(`[Gemini] API key #${i + 1} kena limit kuota, beralih ke key #${i + 2}...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError;
 }
 
 // Versi streaming: mengembalikan potongan teks (chunk) satu per satu begitu Gemini
 // selesai men-generate-nya, bukan menunggu jawaban lengkap. Ini yang dipakai buat efek
 // "AI sedang mengetik" secara real (bukan animasi pura-pura di frontend).
-export async function* askGeminiStream(history: GeminiHistoryItem[], newMessage: string) {
-  const model = genAI.getGenerativeModel({
-    model: GEMINI_MODEL,
-    systemInstruction: SYSTEM_PROMPT
-  });
-
-  const chat = model.startChat({ history });
-  const result = await chat.sendMessageStream(newMessage);
-
-  for await (const chunk of result.stream) {
-    const text = chunk.text();
-    if (text) yield text;
+//
+// Fallback antar-key hanya terjadi SEBELUM ada teks yang mulai dikirim ke user
+// (yaitu waktu memulai koneksi ke Gemini). Kalau kuota habis di tengah-tengah AI
+// sedang mengetik jawaban (kasus langka), fallback tidak dilakukan lagi karena
+// sebagian jawaban sudah kepalang dikirim ke client — error akan tampil sebagai
+// catatan singkat di akhir jawaban (ditangani di app/api/chat/route.ts).
+export async function* askGeminiStream(
+  history: GeminiHistoryItem[],
+  newMessage: string,
+  systemPrompt: string = SYSTEM_PROMPT
+) {
+  if (API_KEYS.length === 0) {
+    throw new Error("Tidak ada GEMINI_API_KEY yang di-set di environment variables.");
   }
+
+  let lastError: any = null;
+
+  for (let i = 0; i < API_KEYS.length; i++) {
+    const genAI = new GoogleGenerativeAI(API_KEYS[i]);
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_MODEL,
+      systemInstruction: systemPrompt
+    });
+
+    let hasYieldedAny = false;
+
+    try {
+      const chat = model.startChat({ history });
+      const result = await chat.sendMessageStream(newMessage);
+
+      for await (const chunk of result.stream) {
+        const text = chunk.text();
+        if (text) {
+          hasYieldedAny = true;
+          yield text;
+        }
+      }
+      return; // berhasil sampai selesai, tidak perlu lanjut ke key berikutnya
+    } catch (err: any) {
+      lastError = err;
+      const isLastKey = i === API_KEYS.length - 1;
+      const canFallback = isQuotaError(err) && !hasYieldedAny && !isLastKey;
+
+      if (canFallback) {
+        console.warn(`[Gemini] API key #${i + 1} kena limit kuota, beralih ke key #${i + 2}...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError;
 }
