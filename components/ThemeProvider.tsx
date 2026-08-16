@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { useVisualViewportHeight } from "@/lib/hooks/useVisualViewportHeight";
 
 type Theme = "light" | "dark";
 interface ThemeContextValue {
@@ -13,6 +14,9 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
+
+  // Fix layout kepotong keyboard mobile — lihat komentar lengkap di file hook-nya.
+  useVisualViewportHeight();
 
   useEffect(() => {
     const stored = localStorage.getItem("devs-ai-theme") as Theme | null;

@@ -15,7 +15,7 @@ export default function ChatLayoutClient({ user, chats, children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="h-dvh flex bg-white dark:bg-night overflow-hidden">
+    <div className="h-app flex bg-white dark:bg-night overflow-hidden">
       {/* Overlay mobile */}
       {sidebarOpen && (
         <div

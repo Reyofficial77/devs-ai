@@ -7,6 +7,15 @@
 :root {
   --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* Fallback sebelum JS sempat jalan (lihat lib/hooks/useVisualViewportHeight.ts) */
+  --app-vh: 100dvh;
+}
+
+/* Dipakai buat container utama, gantinya h-dvh/h-screen. Nilainya di-update
+   otomatis lewat JS supaya ikut menyusut waktu keyboard mobile muncul. */
+.h-app {
+  height: 100dvh; /* fallback browser lama yang gak support custom property di height */
+  height: var(--app-vh);
 }
 
 html {
