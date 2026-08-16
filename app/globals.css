@@ -12,18 +12,26 @@
 }
 
 /* Dipakai buat container utama, gantinya h-dvh/h-screen. Nilainya di-update
-   otomatis lewat JS supaya ikut menyusut waktu keyboard mobile muncul. */
+   otomatis lewat JS supaya ikut menyusut waktu keyboard mobile muncul.
+   Transition di sini yang bikin efek "naik" input-nya jadi mulus,
+   bukan langsung lompat instan. */
 .h-app {
   height: 100dvh; /* fallback browser lama yang gak support custom property di height */
   height: var(--app-vh);
+  transition: height 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html {
   -webkit-tap-highlight-color: transparent;
+  height: 100%;
+  overflow: hidden; /* cegah body ikut scroll/bounce di belakang app pas keyboard mobile muncul */
 }
 
 body {
   background-color: #ffffff;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .dark body {

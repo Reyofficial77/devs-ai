@@ -51,7 +51,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-surface-soft dark:bg-night px-4">
+    <div className="min-h-dvh h-app overflow-y-auto flex items-center justify-center bg-surface-soft dark:bg-night px-4">
       <div className="w-full max-w-sm animate-fadeIn">
         <div className="flex flex-col items-center gap-2 mb-8">
           <div className="w-11 h-11 rounded-xl2 bg-brand-500 dark:bg-violet-500 flex items-center justify-center shadow-panel">

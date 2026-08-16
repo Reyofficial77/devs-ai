@@ -130,7 +130,7 @@ export default function ChatView({ chatId, initialMessages }: Props) {
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           <div className="max-w-3xl mx-auto px-3 md:px-4 py-2">
             {messages.map((m, i) => {
               const isLastAssistant =
