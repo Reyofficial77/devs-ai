@@ -9,16 +9,29 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   /* Fallback sebelum JS sempat jalan (lihat lib/hooks/useVisualViewportHeight.ts) */
   --app-vh: 100dvh;
+  --app-vh-offset: 0px;
 }
 
-/* Dipakai buat container utama, gantinya h-dvh/h-screen. Nilainya di-update
-   otomatis lewat JS supaya ikut menyusut waktu keyboard mobile muncul.
-   Transition di sini yang bikin efek "naik" input-nya jadi mulus,
-   bukan langsung lompat instan. */
+/* Dipakai buat container utama, gantinya h-dvh/h-screen.
+   - height & translateY di-update otomatis lewat JS supaya container ini
+     SELALU pas menempel di area layar yang benar-benar kelihatan, walau
+     keyboard mobile muncul dan menggeser posisi visualViewport.
+   - position: fixed penting di sini — kalau cuma height doang (posisi normal
+     flow), pas visualViewport ikut bergeser (offsetTop > 0), kontennya bisa
+     "ketinggalan" di atas layar dan nyisain celah kosong di bawah.
+   - transition di height & transform yang bikin efek naik/turunnya mulus,
+     bukan lompat instan. */
 .h-app {
-  height: 100dvh; /* fallback browser lama yang gak support custom property di height */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100dvh; /* fallback browser lama yang gak support custom property */
   height: var(--app-vh);
-  transition: height 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  transform: translateY(var(--app-vh-offset));
+  transition:
+    height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html {

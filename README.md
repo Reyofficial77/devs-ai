@@ -218,6 +218,30 @@ Efeknya: kalau kamu buka **chat baru** kapan pun, AI otomatis "ingat" project be
 
 ---
 
+## Testing (Vitest)
+
+Project ini pakai [Vitest](https://vitest.dev) buat unit test fungsi-fungsi penting. Pendekatannya TDD: logic yang murni/pure (gak nyentuh browser API langsung) dipisah ke fungsi sendiri supaya gampang di-test tanpa perlu device/browser beneran.
+
+Jalankan test:
+
+```bash
+npm install
+npm test
+```
+
+Mode watch (auto re-run pas ada perubahan file):
+
+```bash
+npm run test:watch
+```
+
+**Test yang sudah ada:**
+- `lib/hooks/__tests__/computeViewportMetrics.test.ts` — memastikan perhitungan tinggi & offset viewport (buat fix keyboard mobile) benar di berbagai skenario (keyboard tertutup, keyboard terbuka & viewport bergeser, browser tanpa `visualViewport`)
+- `lib/utils/__tests__/codeParser.test.ts` — parsing code block jadi file yang bisa didownload, dan parsing/hiding marker memori project
+- `lib/__tests__/gemini.test.ts` — memastikan ringkasan project besar tersisip dengan benar ke system prompt AI
+
+Kalau nambah fitur baru yang ada logic pentingnya, disarankan tulis test dulu (yang gagal), baru bikin implementasinya sampai test-nya hijau — terutama buat fungsi murni di `lib/`.
+
 ## Struktur Project (ringkas)
 
 ```
