@@ -11,6 +11,11 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  // Ini kuncinya: minta browser (Chrome Android & browser modern lain yang
+  // support) buat BENERAN mengecilkan layout viewport (bukan cuma nutupin
+  // konten) waktu keyboard mobile muncul. Dengan ini, unit "dvh" jadi akurat
+  // secara native tanpa perlu hitungan manual JS yang riskan salah hitung.
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
     { media: "(prefers-color-scheme: dark)", color: "#131320" }

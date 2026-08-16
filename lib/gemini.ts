@@ -34,6 +34,54 @@ function isQuotaError(err: any): boolean {
 // https://ai.google.dev/gemini-api/docs/models dan tinggal ganti string di bawah ini.
 export const GEMINI_MODEL = "gemini-3.6-flash";
 
+// =========================================================
+// Thinking Budget dinamis — biar AI gak "mikir" kelamaan buat pertanyaan
+// simpel, tapi tetap dikasih waktu mikir cukup buat request yang kompleks
+// (misal: minta satu sistem game utuh dengan banyak bagian saling terkait).
+// Gemini 3.6 mendukung thinkingConfig.thinkingBudget (jumlah token "mikir"
+// sebelum mulai menjawab) — makin besar, makin lama tapi makin matang.
+// =========================================================
+
+// Kata kunci yang nunjukin permintaan kompleks/multi-bagian, walau
+// kalimatnya sendiri belum tentu panjang.
+const COMPLEXITY_KEYWORDS = [
+  "sistem",
+  "lengkap",
+  "banyak",
+  "integrasi",
+  "arsitektur",
+  "beberapa file",
+  "project besar",
+  "dari nol",
+  "full",
+  "keseluruhan"
+];
+
+export function getThinkingBudget(message: string): number {
+  const text = message.trim();
+  const length = text.length;
+
+  if (length === 0) return 0;
+
+  const lower = text.toLowerCase();
+  const complexityHits = COMPLEXITY_KEYWORDS.filter((kw) => lower.includes(kw)).length;
+
+  // Sapaan/basa-basi pendek → gak perlu mikir sama sekali.
+  if (length < 20 && complexityHits === 0) return 0;
+
+  // Pertanyaan singkat & simpel.
+  if (length < 80 && complexityHits === 0) return 512;
+
+  // Permintaan menengah (1 fitur/script spesifik).
+  if (length < 300 && complexityHits <= 1) return 2048;
+
+  // Permintaan panjang, atau ada indikasi kompleksitas (multi-fitur/sistem).
+  if (length < 600 || complexityHits >= 2) return 8192;
+
+  // Permintaan besar & panjang sekaligus — kasih budget maksimal.
+  return 16384;
+}
+
 export const SYSTEM_PROMPT = `Kamu adalah "Devs AI", asisten AI khusus untuk para Developer Roblox.
 
 IDENTITAS:
@@ -103,7 +151,12 @@ export async function askGemini(
     const genAI = new GoogleGenerativeAI(API_KEYS[i]);
     const model = genAI.getGenerativeModel({
       model: GEMINI_MODEL,
-      systemInstruction: systemPrompt
+      systemInstruction: systemPrompt,
+      // "as any" karena thinkingConfig masih tipe baru, belum sempat
+      // ke-update di definisi TypeScript versi SDK yang dipakai.
+      generationConfig: {
+        thinkingConfig: { thinkingBudget: getThinkingBudget(newMessage) }
+      } as any
     });
 
     try {
@@ -148,7 +201,12 @@ export async function* askGeminiStream(
     const genAI = new GoogleGenerativeAI(API_KEYS[i]);
     const model = genAI.getGenerativeModel({
       model: GEMINI_MODEL,
-      systemInstruction: systemPrompt
+      systemInstruction: systemPrompt,
+      // "as any" karena thinkingConfig masih tipe baru, belum sempat
+      // ke-update di definisi TypeScript versi SDK yang dipakai.
+      generationConfig: {
+        thinkingConfig: { thinkingBudget: getThinkingBudget(newMessage) }
+      } as any
     });
 
     let hasYieldedAny = false;

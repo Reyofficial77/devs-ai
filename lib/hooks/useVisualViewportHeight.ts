@@ -19,7 +19,7 @@ export interface ViewportMetrics {
 // akibatnya muncul celah kosong di bawah & konten atas seperti "hilang"
 // (ini persis bug yang dilaporkan user).
 export function computeViewportMetrics(
-  visualViewport: VisualViewport | undefined,
+  visualViewport: VisualViewport | null | undefined,
   fallbackHeight: number
 ): ViewportMetrics {
   if (!visualViewport) {
